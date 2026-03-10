@@ -3,3 +3,6 @@ dist/src
 node_modules
 dev
 builds
+dist.crx
+dist.pem
+test-results
