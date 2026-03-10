@@ -59,7 +59,8 @@ export const Production: React.FC = () => {
           style={{ width: 140 }}
           onChange={value => dispatch(setTrainedModel(value))}
         >
-          <Option value={trainedModel}>{trainedModel}</Option>
+          <Option value="MobileNet_v2">MobileNet v2</Option>
+          <Option value="InceptionV3">InceptionV3</Option>
         </Select>
       </DropdownRow>
       <div>Whitelisted websites</div>

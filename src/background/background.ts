@@ -1,117 +1,129 @@
-/* eslint-disable @typescript-eslint/strict-boolean-expressions */
+import { SettingsState } from '../popup/redux/reducers/settings'
+import { StatisticsState } from '../popup/redux/reducers/statistics'
 
-import { enableProdMode } from '@tensorflow/tfjs'
-import { load as loadModel } from 'nsfwjs'
-import { createStore } from 'redux'
+const OFFSCREEN_DOCUMENT_URL = 'src/offscreen.html'
+const STORAGE_KEY = 'nsfw-filter-redux-storage'
+const DEFAULT_TAB_ID = 999999
 
-import { SettingsActionTypes } from '../popup/redux/actions/settings'
-import { StatisticsActionTypes } from '../popup/redux/actions/statistics'
-import { createChromeStore } from '../popup/redux/chrome-storage'
-import { rootReducer, RootState } from '../popup/redux/reducers'
-import { ILogger, Logger } from '../utils/Logger'
-import { PredictionRequest, PredictionResponse } from '../utils/messages'
+// Map of requestId -> sendResponse callback for pending predictions
+const pendingRequests = new Map<string, (response: object) => void>()
 
-import { Model, ModelSettings } from './Model'
-import { DEFAULT_TAB_ID, TabIdUrl } from './Queue/QueueBase'
-import { QueueWrapper as Queue } from './Queue/QueueWrapper'
-
-// @TODO refactor
-
-export type IReduxedStorage = {
-  getState: () => RootState
-  dispatch: (action: SettingsActionTypes | StatisticsActionTypes) => Promise<void> // returns dispatchedAction
+async function readSettings (): Promise<{ settings: SettingsState, statistics: StatisticsState }> {
+  const stored = await chrome.storage.local.get(STORAGE_KEY)
+  const state = (stored[STORAGE_KEY] ?? {}) as Partial<{ settings: SettingsState, statistics: StatisticsState }>
+  return {
+    settings: state.settings ?? { logging: false, filterStrictness: 85, filterEffect: 'blur', trainedModel: 'MobileNet_v2' as const, websites: [] },
+    statistics: state.statistics ?? { totalBlocked: 0 }
+  }
 }
 
-export type loadType = {
-  logger: ILogger
-  store: IReduxedStorage
-  modelSettings: ModelSettings
+async function saveTotalBlocked (totalBlocked: number): Promise<void> {
+  const stored = await chrome.storage.local.get(STORAGE_KEY)
+  const state = (stored[STORAGE_KEY] ?? {}) as object
+  await chrome.storage.local.set({ [STORAGE_KEY]: { ...state, statistics: { totalBlocked } } })
 }
 
-enableProdMode()
-let attempts = 0
+async function ensureOffscreenDocument (): Promise<void> {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
+  })
+  if (existingContexts.length > 0) return
 
-const _buildTabIdUrl = (tab: chrome.tabs.Tab): TabIdUrl => {
-  const tabIdUrl = {
-    tabId: tab?.id ? tab.id : DEFAULT_TAB_ID,
-    tabUrl: tab?.url ? tab?.url : `${DEFAULT_TAB_ID}`
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_DOCUMENT_URL,
+    reasons: [chrome.offscreen.Reason.DOM_SCRAPING],
+    justification: 'NSFW image classification requires DOM access for loading images'
+  })
+
+  // Send initial settings to offscreen once it's created
+  const { settings, statistics } = await readSettings()
+  chrome.runtime.sendMessage({ type: 'OFFSCREEN_INIT', settings, totalBlocked: statistics.totalBlocked }).catch(() => {})
+}
+
+function buildTabIdUrl (tab: chrome.tabs.Tab): { tabId: number, tabUrl: string } {
+  return {
+    tabId: tab?.id ?? DEFAULT_TAB_ID,
+    tabUrl: tab?.url ?? `${DEFAULT_TAB_ID}`
+  }
+}
+
+// Start the offscreen document on service worker startup
+ensureOffscreenDocument().catch(console.error)
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Stats update from offscreen (chrome.storage not available there)
+  if (message.type === 'OFFSCREEN_TOTAL_BLOCKED') {
+    saveTotalBlocked(message.totalBlocked as number).catch(console.error)
+    return
   }
 
-  return tabIdUrl
-}
+  // Response from offscreen document
+  if (message.type === 'PREDICTION_RESULT') {
+    const { requestId, result, url, error } = message
+    const pending = pendingRequests.get(requestId)
+    if (pending != null) {
+      pendingRequests.delete(requestId)
+      const errorMsg = typeof error === 'string' && error.length > 0 ? error : undefined
+      const responseMsg = errorMsg != null
+        ? `Prediction result is ${result as boolean} for image ${url as string}, error: ${errorMsg}`
+        : `Prediction result is ${result as boolean} for image ${url as string}`
+      pending({ result, url, message: responseMsg })
+    }
+    return
+  }
 
-const load = ({ logger, store, modelSettings }: loadType): void => {
-  const MODEL_PATH = '../models/'
+  // Ignore internal extension messages
+  if (message.type === 'SIGN_CONNECT') return
 
-  loadModel(MODEL_PATH, { type: 'graph' })
-    .then(NSFWJSModel => {
-      const model = new Model(NSFWJSModel, logger, modelSettings)
-      const queue = new Queue(model, logger, store)
+  // Prediction request from content script
+  const { url } = message
+  const requestId = `${Date.now()}-${Math.random()}`
+  const tabIdUrl = buildTabIdUrl(sender.tab as chrome.tabs.Tab)
 
-      // Event when content sends request to filter image
-      chrome.runtime.onMessage.addListener((request: PredictionRequest, sender, callback: (value: PredictionResponse) => void) => {
-        if (request.type === 'SIGN_CONNECT') return
+  pendingRequests.set(requestId, sendResponse)
 
-        const { url } = request
-        const tabIdUrl = _buildTabIdUrl(sender.tab as chrome.tabs.Tab)
-        queue.predict(url, tabIdUrl)
-          .then(result => callback(new PredictionResponse(result, url)))
-          .catch(err => callback(new PredictionResponse(false, url, err.message)))
-
-        return true // https://stackoverflow.com/a/56483156
-      })
-
-      // When user opend new tab
-      chrome.tabs.onCreated.addListener(function (tab) {
-        const tabIdUrl = _buildTabIdUrl(tab)
-        queue.addTabIdUrl(tabIdUrl)
-      })
-
-      // When user closed tab
-      chrome.tabs.onRemoved.addListener(function (tabId) {
-        queue.clearByTabId(tabId)
-      })
-
-      // When user went to new url in same domain
-      chrome.tabs.onUpdated.addListener(function (_tabId, changeInfo, tab) {
-        if (changeInfo.status === 'loading') {
-          const tabIdUrl = _buildTabIdUrl(tab)
-          queue.updateTabIdUrl(tabIdUrl)
-        }
-      })
-
-      // When user selected tab as active
-      chrome.tabs.onActivated.addListener(function (activeInfo) {
-        queue.setActiveTabId(activeInfo.tabId)
-      })
-
-      // When user closed popup window
-      chrome.runtime.onConnect.addListener(port => port.onDisconnect.addListener(() => {
-        const { logging, filterStrictness } = store.getState().settings
-
-        logging ? logger.enable() : logger.disable()
-        model.setSettings({ filterStrictness })
-
-        queue.clearCache()
-      }))
+  ensureOffscreenDocument()
+    .then(() => chrome.runtime.sendMessage({
+      type: 'OFFSCREEN_PREDICT',
+      url,
+      requestId,
+      tabIdUrl
+    }))
+    .catch(err => {
+      const pending = pendingRequests.get(requestId)
+      if (pending != null) {
+        pendingRequests.delete(requestId)
+        pending({ result: false, url, message: `Background error: ${err.message as string}` })
+      }
     })
-    .catch(error => {
-      logger.error(error)
-      attempts++
-      if (attempts < 5) setTimeout(load, 200)
 
-      logger.log(`Reload model, attempt: ${attempts}`)
-    })
-}
+  return true // Keep message channel open for async response
+})
 
-const init = async (): Promise<void> => {
-  const store = await createChromeStore({ createStore })(rootReducer)
-  const { logging, filterStrictness } = store.getState().settings
+chrome.tabs.onCreated.addListener(tab => {
+  ensureOffscreenDocument()
+    .then(() => chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_ADD', tabIdUrl: buildTabIdUrl(tab) }))
+    .catch(() => {})
+})
 
-  const logger = new Logger()
-  if (logging === true) logger.enable()
+chrome.tabs.onRemoved.addListener(tabId => {
+  chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_REMOVE', tabId }).catch(() => {})
+})
 
-  load({ logger, store, modelSettings: { filterStrictness } })
-}
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'loading') {
+    chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_UPDATE', tabIdUrl: buildTabIdUrl(tab) }).catch(() => {})
+  }
+})
 
-init()
+chrome.tabs.onActivated.addListener(activeInfo => {
+  chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_ACTIVATE', tabId: activeInfo.tabId }).catch(() => {})
+})
+
+chrome.runtime.onConnect.addListener(port => {
+  port.onDisconnect.addListener(() => {
+    readSettings()
+      .then(({ settings }) => chrome.runtime.sendMessage({ type: 'OFFSCREEN_CLEAR_CACHE', settings }))
+      .catch(() => {})
+  })
+})

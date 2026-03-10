@@ -14,6 +14,7 @@ module.exports = {
     entry: {
         content: `${PATHS.src}/content/content.ts`,
         background: `${PATHS.src}/background/background.ts`,
+        offscreen: `${PATHS.src}/offscreen/offscreen.ts`,
         popup: `${PATHS.src}/popup/index.tsx`,
     },
     output: {
@@ -45,6 +46,7 @@ module.exports = {
         new CopyPlugin({
             patterns: [
                 { from: `${PATHS.src}/popup/popup.html`, to: PATHS.dist },
+                { from: `${PATHS.src}/offscreen/offscreen.html`, to: PATHS.dist },
             ],
         }),
         new AntdDayjsWebpackPlugin(),

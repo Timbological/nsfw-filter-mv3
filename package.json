@@ -7,10 +7,10 @@
     "lint:fix": "eslint . --fix",
     "clean": "rimraf dist/src",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:e2e": "cross-env HEADLESS=false jest --no-cache -c ./test/jest.e2e.config.js",
+    "test:e2e": "playwright test",
     "test:unit": "jest --no-cache -c ./test/jest.unit.config.js",
     "build": "webpack --config webpack/webpack.prod.js",
-    "build:zip": "web-ext build --source-dir dist/ --artifacts-dir ./builds --overwrite-dest", 
+    "build:zip": "web-ext build --source-dir dist/ --artifacts-dir ./builds --overwrite-dest",
     "dev": "webpack --config webpack/webpack.dev.js",
     "dev:chrome": "npm-run-all --parallel dev start:chrome",
     "start:chrome": "web-ext run --source-dir ./dist/ --target=chromium",
@@ -35,6 +35,7 @@
   "homepage": "https://github.com/nsfw-filter/nsfw-filter",
   "license": "GPL-3.0-only",
   "dependencies": {
+    "@tensorflow/tfjs-backend-webgpu": "4.22.0",
     "antd": "5.23.1",
     "nsfwjs": "4.1.0",
     "react": "16.14.0",
@@ -45,6 +46,7 @@
     "styled-components": "5.3.11"
   },
   "devDependencies": {
+    "@playwright/test": "1.58.2",
     "@tensorflow/tfjs": "4.22.0",
     "@types/antd": "1.0.4",
     "@types/chrome": "0.0.290",

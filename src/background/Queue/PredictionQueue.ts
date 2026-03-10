@@ -1,6 +1,6 @@
 import { setTotalBlocked } from '../../popup/redux/actions/statistics'
 import { ILogger } from '../../utils/Logger'
-import { IReduxedStorage } from '../background'
+import { IReduxedStorage } from '../types'
 import { Model } from '../Model'
 
 import { ConcurrentQueue } from './ConcurrentQueue'

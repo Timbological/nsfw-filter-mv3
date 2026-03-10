@@ -1,5 +1,5 @@
 import { ILogger } from '../../utils/Logger'
-import { IReduxedStorage } from '../background'
+import { IReduxedStorage } from '../types'
 import { LRUCache } from '../LRUCache'
 import { Model } from '../Model'
 

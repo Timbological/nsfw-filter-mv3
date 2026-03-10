@@ -22,6 +22,8 @@ export class DOMWatcher implements IDOMWatcher {
   }
 
   public watch (): void {
+    // Scan images already present in the DOM (e.g. direct image URLs, fast-loading pages)
+    this.findAndCheckAllImages(document.documentElement)
     this.observer.observe(document, DOMWatcher.getConfig())
   }
 
