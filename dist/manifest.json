@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Free, open source, and privacy-focused browser extension to aggressively block \"not safe for school\" content.",
   "author": "Liberty IT Team & Tim Wildig",
-  "homepage_url": "https://nsfw-filter.com",
   "manifest_version": 3,
   "permissions": [
     "storage",
@@ -35,7 +34,7 @@
       "48": "images/icon48.png",
       "128": "images/icon128.png"
     },
-    "default_title": "NSFW Filter",
+    "default_title": "The Dress Code Enforcer",
     "default_popup": "src/popup.html"
   },
   "icons": {
