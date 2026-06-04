@@ -1,17 +1,16 @@
-# NSFW Filter
-> Given that the original author is no longer actively maintaining this plugin, this repository will operate independently.
+# The Dresscode Enforcer
 
-A free, open source, and privacy-focused browser extension to block "not safe for work" content.
+The Dresscode Enforcer is a forked extension from NSFW Filter, a free, open source, and privacy-focused browser extension that filters explicit imagery in the browser.
 
 Built using TypeScript, TensorFlow.js, and [NSFWJS](https://github.com/infinitered/nsfwjs).
 
-[Download now from chrome web store!](https://chrome.google.com/webstore/detail/nsfw-filter/kmgagnlkckiamnenbpigfaljmanlbbhh)
+[Download the latest build from this repository](https://github.com/Timbological/nsfw-filter-mv3)
 
-![Demo of using NSFW Filter](demo/images/demo.gif)
+![Demo of using The Dresscode Enforcer](demo/images/demo.gif)
 
 # Table of contents
 
-- [NSFW Filter](#nsfw-filter)
+- [The Dresscode Enforcer](#the-dresscode-enforcer)
 - [Table of contents](#table-of-contents)
 - [Usage](#usage)
 - [Development](#development)
@@ -19,13 +18,13 @@ Built using TypeScript, TensorFlow.js, and [NSFWJS](https://github.com/infiniter
 
 # Usage
 
-You can install the extension from the [chrome web store](https://chrome.google.com/webstore/detail/nsfw-filter/kmgagnlkckiamnenbpigfaljmanlbbhh) or [source](#development).
+You can install the extension from the [source](#development) or build the latest version from this repository.
 
-When you load web pages, NSFW Filter will first hide all images and only show those classified as safe.
+When you load web pages, The Dresscode Enforcer will first hide all images and only show those classified as safe.
 
 To customize the extension, click the icon in your extensions tab.
 
-![NSFW Filter popup](demo/images/popup-window.png)
+![The Dresscode Enforcer popup](demo/images/popup-window.png)
 
 # Development
 

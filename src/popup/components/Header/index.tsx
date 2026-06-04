@@ -12,8 +12,7 @@ export const Header: React.FC = () => {
   return (
     <Container>
       <Title>
-        <span id="logo-first-letters">NSFW </span>
-        <span>Filter</span>
+        <span>The Dresscode Enforcer</span>
         <ThemeToggle>
           <BulbOutlined onClick={() => dispatch({ type: TOGGLE_THEME })} style={{ cursor: 'pointer' }} />
         </ThemeToggle>

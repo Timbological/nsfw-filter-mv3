@@ -1,7 +1,7 @@
 {
-  "name": "nsfw-filter",
+  "name": "the-dresscode-enforcer",
   "version": "3.0.0",
-  "description": "Free, open source, and privacy-focused browser extension to block \"not safe for work\" content.",
+  "description": "The Dresscode Enforcer is a privacy-focused browser extension that filters explicit imagery in the browser.",
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -30,9 +30,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nsfw-filter/nsfw-filter"
+    "url": "https://github.com/Timbological/nsfw-filter-mv3"
   },
-  "homepage": "https://github.com/nsfw-filter/nsfw-filter",
+  "homepage": "https://github.com/Timbological/nsfw-filter-mv3",
   "license": "GPL-3.0-only",
   "dependencies": {
     "@tensorflow/tfjs-backend-webgpu": "4.22.0",
