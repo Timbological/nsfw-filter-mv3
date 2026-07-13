@@ -12,7 +12,7 @@ async function readSettings (): Promise<{ settings: SettingsState, statistics: S
   const stored = await chrome.storage.local.get(STORAGE_KEY)
   const state = (stored[STORAGE_KEY] ?? {}) as Partial<{ settings: SettingsState, statistics: StatisticsState }>
   return {
-    settings: state.settings ?? { logging: false, filterStrictness: 85, filterEffect: 'blur', trainedModel: 'MobileNet_v2' as const, websites: [] },
+    settings: state.settings ?? { logging: false, filterStrictness: 85, filterEffect: 'blur', trainedModel: 'MobileNet_v2' as const, websites: [], videoSampleInterval: 3 },
     statistics: state.statistics ?? { totalBlocked: 0 }
   }
 }

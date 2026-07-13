@@ -2,11 +2,9 @@
 // https://stackoverflow.com/a/39332340/10432429
 
 // @TODO Canvas and SVG
-// @TODO Lazy loading for div.style.background-image?
-// @TODO <div> and <a>
-// @TODO video
 
 import { IImageFilter } from '../Filter/ImageFilter'
+import { IVideoFilter } from '../Filter/VideoFilter'
 
 export type IDOMWatcher = {
   watch: () => void
@@ -15,15 +13,17 @@ export type IDOMWatcher = {
 export class DOMWatcher implements IDOMWatcher {
   private readonly observer: MutationObserver
   private readonly imageFilter: IImageFilter
+  private readonly videoFilter: IVideoFilter | undefined
 
-  constructor (imageFilter: IImageFilter) {
+  constructor (imageFilter: IImageFilter, videoFilter?: IVideoFilter) {
     this.imageFilter = imageFilter
+    this.videoFilter = videoFilter
     this.observer = new MutationObserver(this.callback.bind(this))
   }
 
   public watch (): void {
-    // Scan images already present in the DOM (e.g. direct image URLs, fast-loading pages)
-    this.findAndCheckAllImages(document.documentElement)
+    // Scan media already present in the DOM (e.g. direct image URLs, fast-loading pages)
+    this.findAndCheckAllVisualElements(document.documentElement)
     this.observer.observe(document, DOMWatcher.getConfig())
   }
 
@@ -31,32 +31,67 @@ export class DOMWatcher implements IDOMWatcher {
     for (let i = 0; i < mutationsList.length; i++) {
       const mutation = mutationsList[i]
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        this.findAndCheckAllImages(mutation.target as Element)
+        this.findAndCheckAllVisualElements(mutation.target as Element)
       } else if (mutation.type === 'attributes') {
         this.checkAttributeMutation(mutation)
       }
     }
   }
 
-  private findAndCheckAllImages (element: Element): void {
+  private findAndCheckAllVisualElements (element: Element): void {
     const images = element.getElementsByTagName('img')
     for (let i = 0; i < images.length; i++) {
       this.imageFilter.analyzeImage(images[i], false)
     }
+
+    // Non-<img> visual elements: CSS background-image and lazy-load data-src.
+    const elements = element.querySelectorAll<HTMLElement>('[data-src], [srcset], [style*="background-image"]')
+    for (let i = 0; i < elements.length; i++) {
+      const current = elements[i]
+      if (current.nodeName === 'IMG') continue
+      this.imageFilter.analyzeElement(current, false)
+    }
+
+    if (this.videoFilter === undefined || !this.videoFilter.isEnabled()) return
+    const videos = element.getElementsByTagName('video')
+    for (let i = 0; i < videos.length; i++) {
+      this.videoFilter.analyzeVideo(videos[i])
+    }
   }
 
   private checkAttributeMutation (mutation: MutationRecord): void {
-    if ((mutation.target as HTMLImageElement).nodeName === 'IMG') {
-      const isSrcAttribute = mutation.attributeName === 'src'
-      const isStyleAttribute = mutation.attributeName === 'style'
+    const target = mutation.target as HTMLElement
+    const attrName = mutation.attributeName
 
-      if (isStyleAttribute) {
-        this.imageFilter.checkStyleMutation(mutation.target as HTMLImageElement)
+    if (target.nodeName === 'IMG') {
+      // srcset counts as a source change too: lazy-loaders swap srcset, and it
+      // drives currentSrc for responsive images.
+      const isSrcAttribute = attrName === 'src' || attrName === 'srcset' || attrName === 'data-src'
+
+      if (attrName === 'style') {
+        this.imageFilter.checkStyleMutation(target)
         return
       }
 
-      this.imageFilter.analyzeImage(mutation.target as HTMLImageElement, isSrcAttribute)
+      if (isSrcAttribute) this.imageFilter.analyzeImage(target as HTMLImageElement, true)
+      return
     }
+
+    if (target.nodeName === 'VIDEO' && this.videoFilter !== undefined && this.videoFilter.isEnabled()) {
+      // A src/poster swap means new content to inspect.
+      if (attrName !== 'style') this.videoFilter.analyzeVideo(target as HTMLVideoElement)
+      return
+    }
+
+    // Background-image / lazy-load elements.
+    const isBackgroundAttribute = attrName === 'style' || attrName === 'class' || attrName === 'data-src'
+    if (!isBackgroundAttribute) return
+
+    if (attrName === 'style' || attrName === 'class') {
+      this.imageFilter.checkStyleMutation(target)
+    }
+
+    this.imageFilter.analyzeElement(target, attrName === 'data-src')
   }
 
   private static getConfig (): MutationObserverInit {
@@ -65,7 +100,7 @@ export class DOMWatcher implements IDOMWatcher {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'style']
+      attributeFilter: ['src', 'srcset', 'poster', 'style', 'data-src', 'class']
     }
   }
 }

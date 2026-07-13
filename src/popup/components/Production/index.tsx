@@ -6,7 +6,8 @@ import { setFilterStrictness } from '../../redux/actions/settings'
 import {
   setTrainedModel,
   setFilterEffect,
-  setWebsiteList
+  setWebsiteList,
+  setVideoSampleInterval
 } from '../../redux/actions/settings/index'
 import { RootState } from '../../redux/reducers'
 import { SettingsState } from '../../redux/reducers/settings'
@@ -21,7 +22,8 @@ export const Production: React.FC = () => {
     filterStrictness,
     trainedModel,
     filterEffect,
-    websites
+    websites,
+    videoSampleInterval
   } = useSelector<RootState>((state) => state.settings) as SettingsState
   const { totalBlocked } = useSelector<RootState>((state) => state.statistics) as StatisticsState
 
@@ -61,6 +63,20 @@ export const Production: React.FC = () => {
         >
           <Option value="MobileNet_v2">MobileNet v2</Option>
           <Option value="InceptionV3">InceptionV3</Option>
+        </Select>
+      </DropdownRow>
+      <DropdownRow>
+        <span>Scan videos</span>
+        <Select
+          defaultValue={videoSampleInterval ?? 3}
+          style={{ width: 140 }}
+          onChange={value => dispatch(setVideoSampleInterval(value))}
+        >
+          <Option value={0}>Off</Option>
+          <Option value={2}>Every 2s</Option>
+          <Option value={3}>Every 3s</Option>
+          <Option value={5}>Every 5s</Option>
+          <Option value={10}>Every 10s</Option>
         </Select>
       </DropdownRow>
       <div>Whitelisted websites</div>
