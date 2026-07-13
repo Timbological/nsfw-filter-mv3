@@ -1,7 +1,7 @@
 import { ILogger } from '../../utils/Logger'
-import { IReduxedStorage } from '../types'
 import { LRUCache } from '../LRUCache'
 import { Model } from '../Model'
+import { IReduxedStorage } from '../types'
 
 export type requestQueueValue = Array<Array<{
   resolve: (value: boolean) => void

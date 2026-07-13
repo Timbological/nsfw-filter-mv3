@@ -7,3 +7,4 @@ webpack
 test
 src/popup/popup.html
 jest-puppeteer.config.js
+playwright.config.ts
