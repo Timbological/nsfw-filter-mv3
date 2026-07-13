@@ -62,40 +62,50 @@ export class Model implements IModel {
   }
 
   public async predictImage (image: HTMLImageElement, url: string): Promise<boolean> {
+    const start = this.logger.status ? new Date().getTime() : 0
+
+    // Top-3 so an NSFW class ranked third (behind two benign classes) is still
+    // caught by the second filter.
+    const prediction = await this.model.classify(image, 3)
+    const { result, className, probability } = this.handlePrediction(prediction)
+
     if (this.logger.status) {
-      const start = new Date().getTime()
-
-      const prediction = await this.model.classify(image, 2)
-      const { result, className, probability } = this.handlePrediction(prediction)
-
       const end = new Date().getTime()
       this.logger.log(`IMG prediction (${end - start} ms) is ${className} ${probability} for ${url}`)
-
-      return result
-    } else {
-      const prediction = await this.model.classify(image, 2)
-      return this.handlePrediction(prediction).result
     }
+
+    return result
   }
 
   private handlePrediction (prediction: predictionType[]): { result: boolean, className: string, probability: number } {
-    const [{ className: cn1, probability: pb1 }, { className: cn2, probability: pb2 }] = prediction
+    const [{ className: cn1, probability: pb1 }, ...rest] = prediction
 
-    const result1 = this.FILTER_LIST.has(cn1) && pb1 > (this.firstFilterPercentages.get(cn1) as number)
-    if (result1) return ({ result: result1, className: cn1, probability: pb1 })
+    // Top prediction against the strict first-filter threshold.
+    if (this.isNSFWPrediction(cn1, pb1, true)) return ({ result: true, className: cn1, probability: pb1 })
 
-    // Block when the TOP prediction is an NSFW class that sits below the strict
-    // first-filter bar but still above the looser second-filter bar. Without
-    // this, a well-calibrated model (e.g. InceptionV3) that scores an image
-    // "Sexy 0.55" slips through: it is too low for the first filter, and the
-    // second filter below only ever inspects the runner-up class.
-    const result1b = this.FILTER_LIST.has(cn1) && pb1 > (this.secondFilterPercentages.get(cn1) as number)
-    if (result1b) return ({ result: result1b, className: cn1, probability: pb1 })
+    // Dead-zone fix: also test the TOP class against the looser second-filter
+    // threshold. Without this, a top-ranked NSFW class sitting below the strict
+    // first-filter bar but above the loose one (e.g. a well-calibrated model
+    // scoring "Sexy 0.55") slips through, because the loop below only inspects
+    // the runner-up classes.
+    if (this.isNSFWPrediction(cn1, pb1, false)) return ({ result: true, className: cn1, probability: pb1 })
 
-    const result2 = this.FILTER_LIST.has(cn2) && pb2 > (this.secondFilterPercentages.get(cn2) as number)
-    if (result2) return ({ result: result2, className: cn2, probability: pb2 })
+    // Runner-up classes against the looser second-filter threshold.
+    for (const { className, probability } of rest) {
+      if (this.isNSFWPrediction(className, probability, false)) return ({ result: true, className, probability })
+    }
 
     return ({ result: false, className: cn1, probability: pb1 })
+  }
+
+  private isNSFWPrediction (className: string, probability: number, isTopPrediction: boolean): boolean {
+    if (!this.FILTER_LIST.has(className)) return false
+
+    const threshold = isTopPrediction
+      ? this.firstFilterPercentages.get(className)
+      : this.secondFilterPercentages.get(className)
+
+    return threshold !== undefined && probability > threshold
   }
 
   public static handleFilterStrictness ({ value, minValue, maxValue }: {value: number, minValue: number, maxValue: number}): number {

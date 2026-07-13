@@ -2,8 +2,6 @@
 // https://stackoverflow.com/a/39332340/10432429
 
 // @TODO Canvas and SVG
-// @TODO Lazy loading for div.style.background-image?
-// @TODO <div> and <a>
 
 import { IImageFilter } from '../Filter/ImageFilter'
 import { IVideoFilter } from '../Filter/VideoFilter'
@@ -25,7 +23,7 @@ export class DOMWatcher implements IDOMWatcher {
 
   public watch (): void {
     // Scan media already present in the DOM (e.g. direct image URLs, fast-loading pages)
-    this.findAndCheckAllMedia(document.documentElement)
+    this.findAndCheckAllVisualElements(document.documentElement)
     this.observer.observe(document, DOMWatcher.getConfig())
   }
 
@@ -33,17 +31,25 @@ export class DOMWatcher implements IDOMWatcher {
     for (let i = 0; i < mutationsList.length; i++) {
       const mutation = mutationsList[i]
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        this.findAndCheckAllMedia(mutation.target as Element)
+        this.findAndCheckAllVisualElements(mutation.target as Element)
       } else if (mutation.type === 'attributes') {
         this.checkAttributeMutation(mutation)
       }
     }
   }
 
-  private findAndCheckAllMedia (element: Element): void {
+  private findAndCheckAllVisualElements (element: Element): void {
     const images = element.getElementsByTagName('img')
     for (let i = 0; i < images.length; i++) {
       this.imageFilter.analyzeImage(images[i], false)
+    }
+
+    // Non-<img> visual elements: CSS background-image and lazy-load data-src.
+    const elements = element.querySelectorAll<HTMLElement>('[data-src], [srcset], [style*="background-image"]')
+    for (let i = 0; i < elements.length; i++) {
+      const current = elements[i]
+      if (current.nodeName === 'IMG') continue
+      this.imageFilter.analyzeElement(current, false)
     }
 
     if (this.videoFilter === undefined || !this.videoFilter.isEnabled()) return
@@ -54,27 +60,38 @@ export class DOMWatcher implements IDOMWatcher {
   }
 
   private checkAttributeMutation (mutation: MutationRecord): void {
-    const node = mutation.target as HTMLElement
+    const target = mutation.target as HTMLElement
+    const attrName = mutation.attributeName
 
-    if (node.nodeName === 'IMG') {
+    if (target.nodeName === 'IMG') {
       // srcset counts as a source change too: lazy-loaders swap srcset, and it
       // drives currentSrc for responsive images.
-      const isSrcAttribute = mutation.attributeName === 'src' || mutation.attributeName === 'srcset'
-      const isStyleAttribute = mutation.attributeName === 'style'
+      const isSrcAttribute = attrName === 'src' || attrName === 'srcset' || attrName === 'data-src'
 
-      if (isStyleAttribute) {
-        this.imageFilter.checkStyleMutation(node as HTMLImageElement)
+      if (attrName === 'style') {
+        this.imageFilter.checkStyleMutation(target)
         return
       }
 
-      this.imageFilter.analyzeImage(node as HTMLImageElement, isSrcAttribute)
+      if (isSrcAttribute) this.imageFilter.analyzeImage(target as HTMLImageElement, true)
       return
     }
 
-    if (node.nodeName === 'VIDEO' && this.videoFilter !== undefined && this.videoFilter.isEnabled()) {
+    if (target.nodeName === 'VIDEO' && this.videoFilter !== undefined && this.videoFilter.isEnabled()) {
       // A src/poster swap means new content to inspect.
-      if (mutation.attributeName !== 'style') this.videoFilter.analyzeVideo(node as HTMLVideoElement)
+      if (attrName !== 'style') this.videoFilter.analyzeVideo(target as HTMLVideoElement)
+      return
     }
+
+    // Background-image / lazy-load elements.
+    const isBackgroundAttribute = attrName === 'style' || attrName === 'class' || attrName === 'data-src'
+    if (!isBackgroundAttribute) return
+
+    if (attrName === 'style' || attrName === 'class') {
+      this.imageFilter.checkStyleMutation(target)
+    }
+
+    this.imageFilter.analyzeElement(target, attrName === 'data-src')
   }
 
   private static getConfig (): MutationObserverInit {
@@ -83,7 +100,7 @@ export class DOMWatcher implements IDOMWatcher {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'srcset', 'poster', 'style']
+      attributeFilter: ['src', 'srcset', 'poster', 'style', 'data-src', 'class']
     }
   }
 }
