@@ -4,14 +4,13 @@ import { setBackend, ready, enableProdMode } from '@tensorflow/tfjs'
 import '@tensorflow/tfjs-backend-webgpu'
 import { load as loadModel } from 'nsfwjs'
 
-import { ILogger, Logger } from '../utils/Logger'
-import { SettingsState } from '../popup/redux/reducers/settings'
-import { IReduxedStorage } from '../background/types'
-import { RootState } from '../popup/redux/reducers'
-
 import { Model } from '../background/Model'
 import { DEFAULT_TAB_ID } from '../background/Queue/QueueBase'
 import { QueueWrapper as Queue } from '../background/Queue/QueueWrapper'
+import { IReduxedStorage } from '../background/types'
+import { RootState } from '../popup/redux/reducers'
+import { SettingsState } from '../popup/redux/reducers/settings'
+import { ILogger, Logger } from '../utils/Logger'
 
 enableProdMode()
 
@@ -42,7 +41,7 @@ type PendingPredict = { url: string, requestId: string, tabIdUrl: { tabId: numbe
 // Register the listener immediately so no messages are dropped during model loading
 let queue: Queue | null = null
 let model: Model | null = null
-let logger: ILogger = new Logger()
+const logger: ILogger = new Logger()
 const buffered: PendingPredict[] = []
 
 function dispatchPredict (url: string, requestId: string, tabIdUrl: { tabId: number, tabUrl: string }): void {

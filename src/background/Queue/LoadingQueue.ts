@@ -1,6 +1,6 @@
 import { ILogger } from '../../utils/Logger'
-import { IReduxedStorage } from '../types'
 import { Model } from '../Model'
+import { IReduxedStorage } from '../types'
 
 import { ConcurrentQueue } from './ConcurrentQueue'
 import { PredictionQueue } from './PredictionQueue'

@@ -83,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   pendingRequests.set(requestId, sendResponse)
 
   ensureOffscreenDocument()
-    .then(() => chrome.runtime.sendMessage({
+    .then(async () => await chrome.runtime.sendMessage({
       type: 'OFFSCREEN_PREDICT',
       url,
       requestId,
@@ -102,7 +102,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onCreated.addListener(tab => {
   ensureOffscreenDocument()
-    .then(() => chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_ADD', tabIdUrl: buildTabIdUrl(tab) }))
+    .then(async () => await chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_ADD', tabIdUrl: buildTabIdUrl(tab) }))
     .catch(() => {})
 })
 
@@ -123,7 +123,7 @@ chrome.tabs.onActivated.addListener(activeInfo => {
 chrome.runtime.onConnect.addListener(port => {
   port.onDisconnect.addListener(() => {
     readSettings()
-      .then(({ settings }) => chrome.runtime.sendMessage({ type: 'OFFSCREEN_CLEAR_CACHE', settings }))
+      .then(async ({ settings }) => await chrome.runtime.sendMessage({ type: 'OFFSCREEN_CLEAR_CACHE', settings }))
       .catch(() => {})
   })
 })
