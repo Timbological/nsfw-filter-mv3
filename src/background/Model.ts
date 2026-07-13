@@ -84,6 +84,14 @@ export class Model implements IModel {
     const result1 = this.FILTER_LIST.has(cn1) && pb1 > (this.firstFilterPercentages.get(cn1) as number)
     if (result1) return ({ result: result1, className: cn1, probability: pb1 })
 
+    // Block when the TOP prediction is an NSFW class that sits below the strict
+    // first-filter bar but still above the looser second-filter bar. Without
+    // this, a well-calibrated model (e.g. InceptionV3) that scores an image
+    // "Sexy 0.55" slips through: it is too low for the first filter, and the
+    // second filter below only ever inspects the runner-up class.
+    const result1b = this.FILTER_LIST.has(cn1) && pb1 > (this.secondFilterPercentages.get(cn1) as number)
+    if (result1b) return ({ result: result1b, className: cn1, probability: pb1 })
+
     const result2 = this.FILTER_LIST.has(cn2) && pb2 > (this.secondFilterPercentages.get(cn2) as number)
     if (result2) return ({ result: result2, className: cn2, probability: pb2 })
 

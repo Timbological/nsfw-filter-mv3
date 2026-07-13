@@ -4,7 +4,8 @@ import {
   SET_FILTER_EFFECT,
   SET_TRAINED_MODEL,
   SET_FILTER_STRICTNESS,
-  SET_WEBSITE_LIST
+  SET_WEBSITE_LIST,
+  SET_VIDEO_SAMPLE_INTERVAL
 } from './settingsTypes'
 
 export const toggleLogging = () => ({ type: TOGGLE_LOGGING } as const)
@@ -28,4 +29,10 @@ export const setFilterStrictness = (filterStrictness: number) => ({
 export const setWebsiteList = (websites: string[]) => ({
   type: SET_WEBSITE_LIST,
   payload: { websites }
+} as const)
+
+// 0 disables video scanning entirely; otherwise seconds between frame samples.
+export const setVideoSampleInterval = (videoSampleInterval: number) => ({
+  type: SET_VIDEO_SAMPLE_INTERVAL,
+  payload: { videoSampleInterval }
 } as const)

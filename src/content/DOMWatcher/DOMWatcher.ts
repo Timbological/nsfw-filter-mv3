@@ -4,9 +4,9 @@
 // @TODO Canvas and SVG
 // @TODO Lazy loading for div.style.background-image?
 // @TODO <div> and <a>
-// @TODO video
 
 import { IImageFilter } from '../Filter/ImageFilter'
+import { IVideoFilter } from '../Filter/VideoFilter'
 
 export type IDOMWatcher = {
   watch: () => void
@@ -15,15 +15,17 @@ export type IDOMWatcher = {
 export class DOMWatcher implements IDOMWatcher {
   private readonly observer: MutationObserver
   private readonly imageFilter: IImageFilter
+  private readonly videoFilter: IVideoFilter | undefined
 
-  constructor (imageFilter: IImageFilter) {
+  constructor (imageFilter: IImageFilter, videoFilter?: IVideoFilter) {
     this.imageFilter = imageFilter
+    this.videoFilter = videoFilter
     this.observer = new MutationObserver(this.callback.bind(this))
   }
 
   public watch (): void {
-    // Scan images already present in the DOM (e.g. direct image URLs, fast-loading pages)
-    this.findAndCheckAllImages(document.documentElement)
+    // Scan media already present in the DOM (e.g. direct image URLs, fast-loading pages)
+    this.findAndCheckAllMedia(document.documentElement)
     this.observer.observe(document, DOMWatcher.getConfig())
   }
 
@@ -31,31 +33,47 @@ export class DOMWatcher implements IDOMWatcher {
     for (let i = 0; i < mutationsList.length; i++) {
       const mutation = mutationsList[i]
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        this.findAndCheckAllImages(mutation.target as Element)
+        this.findAndCheckAllMedia(mutation.target as Element)
       } else if (mutation.type === 'attributes') {
         this.checkAttributeMutation(mutation)
       }
     }
   }
 
-  private findAndCheckAllImages (element: Element): void {
+  private findAndCheckAllMedia (element: Element): void {
     const images = element.getElementsByTagName('img')
     for (let i = 0; i < images.length; i++) {
       this.imageFilter.analyzeImage(images[i], false)
     }
+
+    if (this.videoFilter === undefined || !this.videoFilter.isEnabled()) return
+    const videos = element.getElementsByTagName('video')
+    for (let i = 0; i < videos.length; i++) {
+      this.videoFilter.analyzeVideo(videos[i])
+    }
   }
 
   private checkAttributeMutation (mutation: MutationRecord): void {
-    if ((mutation.target as HTMLImageElement).nodeName === 'IMG') {
-      const isSrcAttribute = mutation.attributeName === 'src'
+    const node = mutation.target as HTMLElement
+
+    if (node.nodeName === 'IMG') {
+      // srcset counts as a source change too: lazy-loaders swap srcset, and it
+      // drives currentSrc for responsive images.
+      const isSrcAttribute = mutation.attributeName === 'src' || mutation.attributeName === 'srcset'
       const isStyleAttribute = mutation.attributeName === 'style'
 
       if (isStyleAttribute) {
-        this.imageFilter.checkStyleMutation(mutation.target as HTMLImageElement)
+        this.imageFilter.checkStyleMutation(node as HTMLImageElement)
         return
       }
 
-      this.imageFilter.analyzeImage(mutation.target as HTMLImageElement, isSrcAttribute)
+      this.imageFilter.analyzeImage(node as HTMLImageElement, isSrcAttribute)
+      return
+    }
+
+    if (node.nodeName === 'VIDEO' && this.videoFilter !== undefined && this.videoFilter.isEnabled()) {
+      // A src/poster swap means new content to inspect.
+      if (mutation.attributeName !== 'style') this.videoFilter.analyzeVideo(node as HTMLVideoElement)
     }
   }
 
@@ -65,7 +83,7 @@ export class DOMWatcher implements IDOMWatcher {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['src', 'style']
+      attributeFilter: ['src', 'srcset', 'poster', 'style']
     }
   }
 }

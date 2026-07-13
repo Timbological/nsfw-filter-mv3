@@ -27,13 +27,36 @@ export class ImageFilter extends Filter implements IImageFilter {
     this.settings = settings
   }
 
+  // For <picture>/srcset responsive images the URL actually being displayed
+  // lives in currentSrc; the <img>'s own src attribute is frequently empty.
+  // Reading src alone makes the filter blind to responsive images (e.g. most
+  // editorial imagery on news sites such as abc.net.au).
+  private getImageUrl (image: HTMLImageElement): string {
+    return image.currentSrc.length > 0 ? image.currentSrc : image.src
+  }
+
   public analyzeImage (image: HTMLImageElement, srcAttribute: boolean = false): void {
     const imageIsNotAnalyzed = srcAttribute || image.dataset.nsfwFilterStatus === undefined
-    const isImageValid = image.src.length > 0 && ((image.width > this.MIN_IMAGE_SIZE && image.height > this.MIN_IMAGE_SIZE) || image.height === 0 || image.width === 0)
+    const url = this.getImageUrl(image)
+
+    // currentSrc is only populated once the browser has picked a <source> and
+    // begun loading it. If we run before that (common at document_start or right
+    // after node insertion), defer analysis to the load event rather than
+    // silently dropping a responsive image.
+    if (url.length === 0) {
+      const hasResponsiveSource = image.srcset.length > 0 || image.closest('picture') !== null
+      if (imageIsNotAnalyzed && hasResponsiveSource && image.dataset.nsfwFilterAwaitingLoad === undefined) {
+        image.dataset.nsfwFilterAwaitingLoad = 'true'
+        image.addEventListener('load', () => { this.analyzeImage(image, true) }, { once: true })
+      }
+      return
+    }
+
+    const isImageValid = (image.width > this.MIN_IMAGE_SIZE && image.height > this.MIN_IMAGE_SIZE) || image.height === 0 || image.width === 0
 
     if (imageIsNotAnalyzed && isImageValid) {
       image.dataset.nsfwFilterStatus = 'processing'
-      this._analyzeImage(image)
+      this._analyzeImage(image, url)
     }
   }
 
@@ -42,7 +65,7 @@ export class ImageFilter extends Filter implements IImageFilter {
 
     if (!isStyleOutdated) return
 
-    this.applyFilter(image, image.src)
+    this.applyFilter(image, this.getImageUrl(image))
   }
 
   private isStyleOutdated (image: HTMLImageElement): boolean {
@@ -57,10 +80,10 @@ export class ImageFilter extends Filter implements IImageFilter {
     return isVisibilityHiddenOutdated || isBlurOutdated || isGrayscaleOutdated
   }
 
-  private _analyzeImage (image: HTMLImageElement): void {
+  private _analyzeImage (image: HTMLImageElement, url: string): void {
     this.hideImage(image)
 
-    const request = new PredictionRequest(image.src)
+    const request = new PredictionRequest(url)
     this.requestToAnalyzeImage(request)
       .then(({ result, url }) => {
         if (result) {
@@ -99,7 +122,7 @@ export class ImageFilter extends Filter implements IImageFilter {
   }
 
   private showImage (image: HTMLImageElement, url: string): void {
-    if (image.src === url) {
+    if (this.getImageUrl(image) === url) {
       if (image.parentNode?.nodeName === 'BODY') image.hidden = false
 
       image.dataset.nsfwFilterStatus = 'sfw'

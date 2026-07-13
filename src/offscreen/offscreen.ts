@@ -17,7 +17,7 @@ enableProdMode()
 // In-memory store — chrome.storage is not available in offscreen documents.
 // Settings are pushed here from the service worker via messages.
 const state: RootState = {
-  settings: { logging: false, filterStrictness: 85, filterEffect: 'blur', trainedModel: 'MobileNet_v2', websites: [] },
+  settings: { logging: false, filterStrictness: 85, filterEffect: 'blur', trainedModel: 'MobileNet_v2', websites: [], videoSampleInterval: 3 },
   statistics: { totalBlocked: 0 },
   appearance: { darkTheme: true }
 }

@@ -5,7 +5,8 @@ import {
   SET_FILTER_EFFECT,
   SET_TRAINED_MODEL,
   SET_FILTER_STRICTNESS,
-  SET_WEBSITE_LIST
+  SET_WEBSITE_LIST,
+  SET_VIDEO_SAMPLE_INTERVAL
 } from '../actions/settings/settingsTypes'
 
 export type SettingsState = {
@@ -14,6 +15,8 @@ export type SettingsState = {
   trainedModel: 'MobileNet_v2' | 'InceptionV3'
   filterStrictness: number
   websites: string[]
+  // Seconds between video frame samples. 0 disables video scanning.
+  videoSampleInterval: number
 }
 
 const initialState: SettingsState = {
@@ -21,7 +24,8 @@ const initialState: SettingsState = {
   filterEffect: 'blur',
   trainedModel: 'MobileNet_v2',
   filterStrictness: 85,
-  websites: []
+  websites: [],
+  videoSampleInterval: 3
 }
 
 export function settings (state = initialState, action: SettingsActionTypes): SettingsState {
@@ -36,6 +40,8 @@ export function settings (state = initialState, action: SettingsActionTypes): Se
       return { ...state, filterStrictness: action.payload.filterStrictness }
     case SET_WEBSITE_LIST:
       return { ...state, websites: action.payload.websites }
+    case SET_VIDEO_SAMPLE_INTERVAL:
+      return { ...state, videoSampleInterval: action.payload.videoSampleInterval }
     default:
       return state
   }
