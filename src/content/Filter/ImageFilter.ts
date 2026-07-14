@@ -34,27 +34,41 @@ export class ImageFilter extends Filter implements IImageFilter {
 
   public analyzeImage (image: HTMLImageElement, srcAttribute: boolean = false): void {
     const imageIsNotAnalyzed = srcAttribute || image.dataset.nsfwFilterStatus === undefined
+    if (!imageIsNotAnalyzed) return
+
     const url = this.getImageUrl(image)
 
     // For <picture>/srcset the displayed URL lives in currentSrc, which isn't
     // populated until the browser has picked a <source> and started loading it
     // (often after document_start / node insertion). Defer to the load event
-    // instead of silently dropping the image.
+    // rather than dropping the image; the pending-hide stylesheet keeps it
+    // hidden until we can classify it.
     if (url.length === 0) {
       const hasResponsiveSource = image.srcset.length > 0 || image.closest('picture') !== null
-      if (imageIsNotAnalyzed && hasResponsiveSource && image.dataset.nsfwFilterAwaitingLoad === undefined) {
+      if (hasResponsiveSource && image.dataset.nsfwFilterAwaitingLoad === undefined) {
         image.dataset.nsfwFilterAwaitingLoad = 'true'
         image.addEventListener('load', () => { this.analyzeImage(image, true) }, { once: true })
+        return
       }
+      // Empty, non-responsive image: nothing to classify. Tag it safe so the
+      // pending-hide stylesheet releases it (a later src change re-triggers
+      // analysis via the attribute observer).
+      this.revealSafe(image)
       return
     }
 
+    // Images laid out smaller than MIN_IMAGE_SIZE aren't worth filtering (icons,
+    // spacers), but they must still be tagged so the pending-hide stylesheet
+    // reveals them. A zero width/height means "not laid out yet" — still a
+    // candidate.
     const isImageValid = (image.width > this.MIN_IMAGE_SIZE && image.height > this.MIN_IMAGE_SIZE) || image.height === 0 || image.width === 0
-
-    if (imageIsNotAnalyzed && isImageValid) {
-      image.dataset.nsfwFilterStatus = STATUS_PROCESSING
-      this._analyzeElement(image, url)
+    if (!isImageValid) {
+      this.revealSafe(image)
+      return
     }
+
+    image.dataset.nsfwFilterStatus = STATUS_PROCESSING
+    this._analyzeElement(image, url)
   }
 
   // Non-<img> visual elements: CSS background-image and lazy-load data-src on
@@ -71,6 +85,15 @@ export class ImageFilter extends Filter implements IImageFilter {
   }
 
   public checkStyleMutation (element: HTMLElement): void {
+    // While a verdict is still in flight the element is held hidden only by our
+    // inline visibility (the pending-hide stylesheet stopped matching the moment
+    // we tagged it 'processing'). A site re-render can wipe that inline style, so
+    // re-hide rather than let unclassified content flash before we know.
+    if (element.dataset.nsfwFilterStatus === STATUS_PROCESSING) {
+      if (element.style.visibility !== 'hidden') this.hideElement(element)
+      return
+    }
+
     if (!this.isStyleOutdated(element)) return
 
     const url = this.getBackgroundImageUrl(element)
@@ -91,7 +114,10 @@ export class ImageFilter extends Filter implements IImageFilter {
   }
 
   private _analyzeElement (element: HTMLElement, url: string): void {
-    this.applyInitialBlur(element)
+    // Hide-first: keep the element fully hidden (not merely blurred) until the
+    // verdict, so nothing — not even a blurred silhouette — is shown during
+    // classification. The chosen effect is applied only once it's blocked.
+    this.hideElement(element)
 
     const request = new PredictionRequest(url)
     this.requestToAnalyzeImage(request)
@@ -147,13 +173,12 @@ export class ImageFilter extends Filter implements IImageFilter {
     }
   }
 
-  // Blur immediately, before the verdict, so NSFW content never flashes visible
-  // during classification and there's no click-to-reveal teaser.
-  private applyInitialBlur (element: HTMLElement): void {
-    element.style.setProperty('filter', 'blur(25px)', 'important')
-    element.style.visibility = 'visible'
-
+  // Reveal an element we've decided not to filter (too small, empty, or safe).
+  // Tagging a status is what releases it from the pending-hide stylesheet.
+  private revealSafe (element: HTMLElement): void {
     if (element instanceof HTMLImageElement && element.parentNode?.nodeName === 'BODY') element.hidden = false
+    element.dataset.nsfwFilterStatus = STATUS_SFW
+    element.style.visibility = 'visible'
   }
 
   private applyFilter (element: HTMLElement, _url: string): void {
@@ -191,9 +216,10 @@ export class ImageFilter extends Filter implements IImageFilter {
     if (this.getBackgroundImageUrl(element) !== url) return
 
     if (element instanceof HTMLImageElement && element.parentNode?.nodeName === 'BODY') element.hidden = false
-    // Clear the initial blur only for genuinely safe content.
+    // Genuinely safe: drop any effect we'd applied (e.g. from a prior nsfw verdict
+    // before the src changed), restoring the page's own styling.
     if (element.dataset.nsfwFilterStatus !== STATUS_NSFW) {
-      element.style.setProperty('filter', 'none', 'important')
+      element.style.removeProperty('filter')
     }
 
     element.dataset.nsfwFilterStatus = STATUS_SFW
