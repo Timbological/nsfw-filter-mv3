@@ -65,9 +65,15 @@ function dispatchPredict (url: string, requestId: string, tabIdUrl: { tabId: num
 // content mid-flight.
 const modelController = new ModelController<Model>({
   loadFn: async (trainedModel) => {
-    const modelPath = chrome.runtime.getURL(trainedModel === 'InceptionV3' ? 'models/inceptionv3/' : 'models/')
-    const modelSize = trainedModel === 'InceptionV3' ? 299 : 224
-    const nsfwjsModel = await loadModel(modelPath, { type: 'graph', size: modelSize })
+    // InceptionV3 ships as a Keras *layers* model; MobileNet is a TFJS *graph*
+    // model. Loading a layers model with { type: 'graph' } throws
+    // ("Cannot read properties of undefined (reading 'producer')"), which is
+    // why selecting InceptionV3 previously failed to load at all.
+    const isInception = trainedModel === 'InceptionV3'
+    const modelPath = chrome.runtime.getURL(isInception ? 'models/inceptionv3/' : 'models/')
+    const nsfwjsModel = isInception
+      ? await loadModel(modelPath, { size: 299 })
+      : await loadModel(modelPath, { type: 'graph', size: 224 })
     return new Model(nsfwjsModel, logger, { filterStrictness: state.settings.filterStrictness })
   },
   onReady: (newModel, trainedModel) => {
