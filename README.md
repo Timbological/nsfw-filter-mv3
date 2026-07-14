@@ -5,7 +5,7 @@ A free, open source, and privacy-focused browser extension to block "not safe fo
 
 Built using TypeScript, TensorFlow.js, and [NSFWJS](https://github.com/infinitered/nsfwjs).
 
-[Download now from chrome web store!](https://chrome.google.com/webstore/detail/nsfw-filter/kmgagnlkckiamnenbpigfaljmanlbbhh)
+[Download now from chrome web store!](https://chromewebstore.google.com/detail/nsfw-filter-2026/cnfnlpcnbdfcfamngecfamodlmgmjdod)
 
 ![Demo of using NSFW Filter](demo/images/demo.gif)
 
@@ -19,7 +19,7 @@ Built using TypeScript, TensorFlow.js, and [NSFWJS](https://github.com/infiniter
 
 # Usage
 
-You can install the extension from the [chrome web store](https://chrome.google.com/webstore/detail/nsfw-filter/kmgagnlkckiamnenbpigfaljmanlbbhh) or [source](#development).
+You can install the extension from the [chrome web store](https://chromewebstore.google.com/detail/nsfw-filter-2026/cnfnlpcnbdfcfamngecfamodlmgmjdod) or [source](#development).
 
 When you load web pages, NSFW Filter will first hide all images and only show those classified as safe.
 
