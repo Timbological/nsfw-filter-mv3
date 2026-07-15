@@ -1,5 +1,6 @@
 import { SettingsState } from '../popup/redux/reducers/settings'
 import { StatisticsState } from '../popup/redux/reducers/statistics'
+import { extensionsPageBlocked } from '../popup/utils/lock'
 
 const OFFSCREEN_DOCUMENT_URL = 'src/offscreen.html'
 const STORAGE_KEY = 'nsfw-filter-redux-storage'
@@ -44,6 +45,26 @@ function buildTabIdUrl (tab: chrome.tabs.Tab): { tabId: number, tabUrl: string }
   return {
     tabId: tab?.id ?? DEFAULT_TAB_ID,
     tabUrl: tab?.url ?? `${DEFAULT_TAB_ID}`
+  }
+}
+
+// Redirect chrome://extensions away when the lock's "block extensions page"
+// option is on — so a child can't disable/remove the extension there. Content
+// scripts can't run on chrome:// pages, but a tabs listener can (it also wakes
+// this service worker), which is the mechanism focus extensions like StayFocusd
+// use. A password holder gets a grace window via extensionsPageAllowedUntil.
+async function guardExtensionsPage (tabId: number | undefined, url: string | undefined): Promise<void> {
+  if (tabId === undefined) return
+  const { settings } = await readSettings()
+  const blocked = extensionsPageBlocked({
+    url,
+    blockExtensionsPage: settings.blockExtensionsPage,
+    hasLock: settings.lock !== null && settings.lock !== undefined,
+    allowedUntil: settings.extensionsPageAllowedUntil,
+    now: Date.now()
+  })
+  if (blocked) {
+    chrome.tabs.update(tabId, { url: chrome.runtime.getURL('blocked.html') }).catch(() => {})
   }
 }
 
@@ -101,6 +122,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 chrome.tabs.onCreated.addListener(tab => {
+  guardExtensionsPage(tab.id, tab.pendingUrl ?? tab.url).catch(() => {})
   ensureOffscreenDocument()
     .then(async () => await chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_ADD', tabIdUrl: buildTabIdUrl(tab) }))
     .catch(() => {})
@@ -110,7 +132,10 @@ chrome.tabs.onRemoved.addListener(tabId => {
   chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_REMOVE', tabId }).catch(() => {})
 })
 
-chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'loading' || changeInfo.url !== undefined) {
+    guardExtensionsPage(tabId, changeInfo.url ?? tab.pendingUrl ?? tab.url).catch(() => {})
+  }
   if (changeInfo.status === 'loading') {
     chrome.runtime.sendMessage({ type: 'OFFSCREEN_TAB_UPDATE', tabIdUrl: buildTabIdUrl(tab) }).catch(() => {})
   }

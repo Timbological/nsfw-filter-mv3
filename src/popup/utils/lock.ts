@@ -59,6 +59,10 @@ export type GuardedSettings = {
   filterEffect: 'hide' | 'blur' | 'grayscale'
   websites: string[]
   videoSampleInterval: number
+  // Lock scope/protection toggles. Turning either OFF reduces protection, so
+  // it's gated like any other weakening once locked.
+  lockAllSettings: boolean
+  blockExtensionsPage: boolean
 }
 
 // Video strictness: more frequent sampling is stricter; a longer interval is
@@ -88,5 +92,32 @@ export const weakens = (prev: GuardedSettings, next: GuardedSettings): boolean =
 
   if (videoRank(next.videoSampleInterval) < videoRank(prev.videoSampleInterval)) return true
 
+  // Reducing the lock's own scope is a weakening.
+  if (prev.lockAllSettings && !next.lockAllSettings) return true
+  if (prev.blockExtensionsPage && !next.blockExtensionsPage) return true
+
   return false
 }
+
+// --- chrome://extensions guard (used by the background service worker) ---
+
+export const EXTENSIONS_URL_PREFIX = 'chrome://extensions'
+
+export const isExtensionsUrl = (url: string | undefined): boolean =>
+  typeof url === 'string' && url.startsWith(EXTENSIONS_URL_PREFIX)
+
+// Whether a navigation to `url` should be blocked. Only blocks when the feature
+// is on AND a password exists (otherwise there'd be no way to unlock — you'd
+// lock yourself out of your own extensions page), and not during the post-unlock
+// grace window (`allowedUntil`) that lets the parent through.
+export const extensionsPageBlocked = (args: {
+  url?: string
+  blockExtensionsPage?: boolean
+  hasLock: boolean
+  allowedUntil?: number
+  now: number
+}): boolean =>
+  isExtensionsUrl(args.url) &&
+  args.blockExtensionsPage === true &&
+  args.hasLock &&
+  args.now > (args.allowedUntil ?? 0)

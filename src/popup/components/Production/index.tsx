@@ -1,4 +1,4 @@
-import { Button, Input, Select, Slider } from 'antd'
+import { Button, Checkbox, Input, Select, Slider } from 'antd'
 import React, { useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 
@@ -7,7 +7,10 @@ import {
   setFilterEffect,
   setWebsiteList,
   setVideoSampleInterval,
-  setLock
+  setLock,
+  setLockAllSettings,
+  setBlockExtensionsPage,
+  setExtensionsPageAllowedUntil
 } from '../../redux/actions/settings/index'
 import { RootState } from '../../redux/reducers'
 import { SettingsState } from '../../redux/reducers/settings'
@@ -18,6 +21,8 @@ import { Container, Stats, DropdownRow, TextBox } from './styles'
 
 const { Option } = Select
 const MIN_PASSWORD_LENGTH = 4
+// How long after an unlock chrome://extensions stays reachable for the parent.
+const EXTENSIONS_GRACE_MS = 5 * 60 * 1000
 
 export const Production: React.FC = () => {
   const dispatch = useDispatch()
@@ -26,7 +31,9 @@ export const Production: React.FC = () => {
     filterEffect,
     websites,
     videoSampleInterval,
-    lock
+    lock,
+    lockAllSettings,
+    blockExtensionsPage
   } = useSelector<RootState>((state) => state.settings) as SettingsState
   const { totalBlocked } = useSelector<RootState>((state) => state.statistics) as StatisticsState
 
@@ -37,16 +44,32 @@ export const Production: React.FC = () => {
 
   const hasLock = lock !== null && lock !== undefined
   const locked = hasLock && !unlocked
-  const current: GuardedSettings = { filterStrictness, filterEffect, websites, videoSampleInterval }
+  const current: GuardedSettings = {
+    filterStrictness,
+    filterEffect,
+    websites,
+    videoSampleInterval,
+    lockAllSettings: lockAllSettings === true,
+    blockExtensionsPage: blockExtensionsPage === true
+  }
 
-  // Apply a guarded change, unless it weakens protection while locked.
+  // Apply a guarded change unless it's blocked while locked. In "lock all"
+  // mode every guarded change needs the password; otherwise only weakenings do.
   const guard = (next: Partial<GuardedSettings>, apply: () => void): void => {
-    if (locked && weakens(current, { ...current, ...next })) {
-      setGuardMessage('🔒 Locked — enter the password below to reduce protection')
+    if (locked && (lockAllSettings === true || weakens(current, { ...current, ...next }))) {
+      setGuardMessage(lockAllSettings === true
+        ? '🔒 Locked — enter the password below to change settings'
+        : '🔒 Locked — enter the password below to reduce protection')
       return
     }
     setGuardMessage('')
     apply()
+  }
+
+  // Let the parent through to chrome://extensions for a while after they prove
+  // the password (or just set it).
+  const grantExtensionsAccess = (): void => {
+    dispatch(setExtensionsPageAllowedUntil(Date.now() + EXTENSIONS_GRACE_MS))
   }
 
   const handleSetPassword = async (): Promise<void> => {
@@ -55,6 +78,7 @@ export const Production: React.FC = () => {
       return
     }
     dispatch(setLock(await createLock(password)))
+    grantExtensionsAccess()
     setPassword('')
     setUnlocked(true)
     setLockMessage('Protection on — weakening changes now need this password')
@@ -62,6 +86,7 @@ export const Production: React.FC = () => {
 
   const handleUnlock = async (): Promise<void> => {
     if (lock !== null && lock !== undefined && await verifyLock(password, lock)) {
+      grantExtensionsAccess()
       setUnlocked(true)
       setPassword('')
       setLockMessage('')
@@ -70,6 +95,34 @@ export const Production: React.FC = () => {
       setLockMessage('Incorrect password')
     }
   }
+
+  const toggleLockAll = (checked: boolean): void =>
+    guard({ lockAllSettings: checked }, () => dispatch(setLockAllSettings(checked)))
+
+  const toggleBlockExtensions = (checked: boolean): void =>
+    guard({ blockExtensionsPage: checked }, () => {
+      dispatch(setBlockExtensionsPage(checked))
+      // Don't lock the parent out the instant they enable it.
+      if (checked) grantExtensionsAccess()
+    })
+
+  const protectionOptions = (
+    <>
+      <div style={{ marginTop: 8 }}>
+        <Checkbox checked={lockAllSettings === true} onChange={event => toggleLockAll(event.target.checked)}>
+          Lock all settings, not just weakening
+        </Checkbox>
+      </div>
+      <div>
+        <Checkbox checked={blockExtensionsPage === true} onChange={event => toggleBlockExtensions(event.target.checked)}>
+          Block the Chrome extensions page
+        </Checkbox>
+        <div style={{ fontSize: 11, opacity: 0.7 }}>
+          Needs a password. A deterrent only — use Family Link to truly prevent removal.
+        </div>
+      </div>
+    </>
+  )
 
   return (
     (<Container>
@@ -139,6 +192,7 @@ export const Production: React.FC = () => {
             <Button type="primary" style={{ marginTop: 8 }} onClick={() => { handleSetPassword().catch(() => undefined) }}>
               Set password
             </Button>
+            {protectionOptions}
             {lockMessage !== '' && <div style={{ marginTop: 8 }}>{lockMessage}</div>}
           </TextBox>
         )
@@ -163,6 +217,7 @@ export const Production: React.FC = () => {
               <div>🔓 Unlocked</div>
               <Button style={{ marginRight: 8 }} onClick={() => setUnlocked(false)}>Re-lock</Button>
               <Button danger onClick={() => { dispatch(setLock(null)); setUnlocked(false) }}>Remove password</Button>
+              {protectionOptions}
             </TextBox>
           )}
     </Container>)

@@ -45,7 +45,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["models/*", "images/*"],
+      "resources": ["models/*", "images/*", "blocked.html"],
       "matches": ["<all_urls>"]
     }
   ]

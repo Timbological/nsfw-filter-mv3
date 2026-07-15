@@ -7,7 +7,10 @@ import {
   SET_FILTER_STRICTNESS,
   SET_WEBSITE_LIST,
   SET_VIDEO_SAMPLE_INTERVAL,
-  SET_LOCK
+  SET_LOCK,
+  SET_LOCK_ALL_SETTINGS,
+  SET_BLOCK_EXTENSIONS_PAGE,
+  SET_EXTENSIONS_PAGE_ALLOWED_UNTIL
 } from '../actions/settings/settingsTypes'
 
 export type SettingsState = {
@@ -25,6 +28,14 @@ export type SettingsState = {
   websites: string[]
   // Seconds between video frame samples. 0 disables video scanning.
   videoSampleInterval: number
+  // Lock scope: when true, ALL settings changes need the password (not only
+  // weakening ones).
+  lockAllSettings?: boolean
+  // Redirect chrome://extensions when set (and a lock exists), except during
+  // the post-unlock grace window below.
+  blockExtensionsPage?: boolean
+  // Timestamp (ms) until which chrome://extensions is allowed after an unlock.
+  extensionsPageAllowedUntil?: number
 }
 
 const initialState: SettingsState = {
@@ -50,6 +61,12 @@ export function settings (state = initialState, action: SettingsActionTypes): Se
       return { ...state, videoSampleInterval: action.payload.videoSampleInterval }
     case SET_LOCK:
       return { ...state, lock: action.payload.lock }
+    case SET_LOCK_ALL_SETTINGS:
+      return { ...state, lockAllSettings: action.payload.lockAllSettings }
+    case SET_BLOCK_EXTENSIONS_PAGE:
+      return { ...state, blockExtensionsPage: action.payload.blockExtensionsPage }
+    case SET_EXTENSIONS_PAGE_ALLOWED_UNTIL:
+      return { ...state, extensionsPageAllowedUntil: action.payload.extensionsPageAllowedUntil }
     default:
       return state
   }
