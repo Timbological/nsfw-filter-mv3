@@ -7,7 +7,10 @@ import {
   SET_FILTER_STRICTNESS,
   SET_WEBSITE_LIST,
   SET_VIDEO_SAMPLE_INTERVAL,
-  SET_LOCK
+  SET_LOCK,
+  SET_LOCK_ALL_SETTINGS,
+  SET_BLOCK_EXTENSIONS_PAGE,
+  SET_EXTENSIONS_PAGE_ALLOWED_UNTIL
 } from './settingsTypes'
 
 export const toggleLogging = () => ({ type: TOGGLE_LOGGING } as const)
@@ -38,4 +41,24 @@ export const setVideoSampleInterval = (videoSampleInterval: number) => ({
 export const setLock = (lock: LockCredential | null) => ({
   type: SET_LOCK,
   payload: { lock }
+} as const)
+
+// When true (and locked), ALL settings changes need the password, not just
+// weakening ones.
+export const setLockAllSettings = (lockAllSettings: boolean) => ({
+  type: SET_LOCK_ALL_SETTINGS,
+  payload: { lockAllSettings }
+} as const)
+
+// When true (and a lock is set), navigations to chrome://extensions are
+// redirected — unless within the post-unlock grace window.
+export const setBlockExtensionsPage = (blockExtensionsPage: boolean) => ({
+  type: SET_BLOCK_EXTENSIONS_PAGE,
+  payload: { blockExtensionsPage }
+} as const)
+
+// Timestamp (ms) until which chrome://extensions is allowed after an unlock.
+export const setExtensionsPageAllowedUntil = (extensionsPageAllowedUntil: number) => ({
+  type: SET_EXTENSIONS_PAGE_ALLOWED_UNTIL,
+  payload: { extensionsPageAllowedUntil }
 } as const)

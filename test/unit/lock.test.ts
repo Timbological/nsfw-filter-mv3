@@ -1,6 +1,6 @@
-import { createLock, verifyLock, weakens, GuardedSettings } from '../../src/popup/utils/lock'
+import { createLock, verifyLock, weakens, GuardedSettings, extensionsPageBlocked, isExtensionsUrl } from '../../src/popup/utils/lock'
 
-const base: GuardedSettings = { filterStrictness: 85, filterEffect: 'blur', websites: ['a.com'], videoSampleInterval: 3 }
+const base: GuardedSettings = { filterStrictness: 85, filterEffect: 'blur', websites: ['a.com'], videoSampleInterval: 3, lockAllSettings: false, blockExtensionsPage: false }
 const change = (over: Partial<GuardedSettings>): GuardedSettings => ({ ...base, ...over })
 
 describe('popup => lock => password', () => {
@@ -56,5 +56,36 @@ describe('popup => lock => weakens', () => {
     expect(weakens(base, change({ videoSampleInterval: 10 }))).toBe(true) // less frequent
     expect(weakens(base, change({ videoSampleInterval: 2 }))).toBe(false) // more frequent
     expect(weakens(change({ videoSampleInterval: 0 }), change({ videoSampleInterval: 3 }))).toBe(false) // off -> on
+  })
+
+  test('turning off a protection toggle weakens; turning it on does not', () => {
+    const guarded = change({ lockAllSettings: true, blockExtensionsPage: true })
+    expect(weakens(guarded, change({ lockAllSettings: false, blockExtensionsPage: true }))).toBe(true)
+    expect(weakens(guarded, change({ lockAllSettings: true, blockExtensionsPage: false }))).toBe(true)
+    expect(weakens(base, change({ lockAllSettings: true }))).toBe(false)
+    expect(weakens(base, change({ blockExtensionsPage: true }))).toBe(false)
+  })
+})
+
+describe('popup => lock => extensionsPageBlocked', () => {
+  test('recognises the extensions URL', () => {
+    expect(isExtensionsUrl('chrome://extensions/')).toBe(true)
+    expect(isExtensionsUrl('chrome://extensions/?id=abc')).toBe(true)
+    expect(isExtensionsUrl('chrome://settings/')).toBe(false)
+    expect(isExtensionsUrl('https://example.com')).toBe(false)
+    expect(isExtensionsUrl(undefined)).toBe(false)
+  })
+
+  test('blocks only when enabled, a lock exists, and outside the grace window', () => {
+    const on = { url: 'chrome://extensions/', blockExtensionsPage: true, hasLock: true }
+    expect(extensionsPageBlocked({ ...on, allowedUntil: 0, now: 1000 })).toBe(true)
+    // within grace window -> allowed
+    expect(extensionsPageBlocked({ ...on, allowedUntil: 5000, now: 1000 })).toBe(false)
+    // feature off -> allowed
+    expect(extensionsPageBlocked({ ...on, blockExtensionsPage: false, now: 1000 })).toBe(false)
+    // no password set -> never block (else you'd lock yourself out)
+    expect(extensionsPageBlocked({ ...on, hasLock: false, now: 1000 })).toBe(false)
+    // not the extensions page -> allowed
+    expect(extensionsPageBlocked({ ...on, url: 'https://example.com', now: 1000 })).toBe(false)
   })
 })
