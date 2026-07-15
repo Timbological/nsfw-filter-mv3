@@ -37,7 +37,7 @@ export const Production: React.FC = () => {
 
   const hasLock = lock !== null && lock !== undefined
   const locked = hasLock && !unlocked
-  const current: GuardedSettings = { filterStrictness, websites, videoSampleInterval }
+  const current: GuardedSettings = { filterStrictness, filterEffect, websites, videoSampleInterval }
 
   // Apply a guarded change, unless it weakens protection while locked.
   const guard = (next: Partial<GuardedSettings>, apply: () => void): void => {
@@ -90,9 +90,9 @@ export const Production: React.FC = () => {
       <DropdownRow>
         <span>Filter effect</span>
         <Select
-          defaultValue={filterEffect}
+          value={filterEffect}
           style={{ width: 140 }}
-          onChange={value => dispatch(setFilterEffect(value))}
+          onChange={value => guard({ filterEffect: value }, () => dispatch(setFilterEffect(value)))}
         >
           <Option value="hide">Hide</Option>
           <Option value="blur">Blur</Option>
