@@ -1,16 +1,22 @@
 
+import { LockCredential } from '../../utils/lock'
 import { SettingsActionTypes } from '../actions/settings'
 import {
   TOGGLE_LOGGING,
   SET_FILTER_EFFECT,
   SET_FILTER_STRICTNESS,
   SET_WEBSITE_LIST,
-  SET_VIDEO_SAMPLE_INTERVAL
+  SET_VIDEO_SAMPLE_INTERVAL,
+  SET_LOCK
 } from '../actions/settings/settingsTypes'
 
 export type SettingsState = {
   logging: boolean
   filterEffect: 'hide' | 'blur' | 'grayscale'
+  // Present once a parent sets a settings-lock password; gates weakening
+  // changes. Optional so the offscreen/background settings literals need no
+  // change.
+  lock?: LockCredential | null
   // Only MobileNet_v2 ships. InceptionV3 was removed in 3.2.1: as a Keras
   // layers model it produced garbage verdicts on the WebGPU backend (fail-open)
   // and was more permissive than MobileNet even when working.
@@ -42,6 +48,8 @@ export function settings (state = initialState, action: SettingsActionTypes): Se
       return { ...state, websites: action.payload.websites }
     case SET_VIDEO_SAMPLE_INTERVAL:
       return { ...state, videoSampleInterval: action.payload.videoSampleInterval }
+    case SET_LOCK:
+      return { ...state, lock: action.payload.lock }
     default:
       return state
   }
