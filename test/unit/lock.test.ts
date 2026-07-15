@@ -1,6 +1,6 @@
 import { createLock, verifyLock, weakens, GuardedSettings } from '../../src/popup/utils/lock'
 
-const base: GuardedSettings = { filterStrictness: 85, websites: ['a.com'], videoSampleInterval: 3 }
+const base: GuardedSettings = { filterStrictness: 85, filterEffect: 'blur', websites: ['a.com'], videoSampleInterval: 3 }
 const change = (over: Partial<GuardedSettings>): GuardedSettings => ({ ...base, ...over })
 
 describe('popup => lock => password', () => {
@@ -41,6 +41,14 @@ describe('popup => lock => weakens', () => {
 
   test('whitespace-only whitelist noise is ignored', () => {
     expect(weakens(base, change({ websites: ['a.com', '  '] }))).toBe(false)
+  })
+
+  test('a weaker filter effect weakens; a stronger one does not (hide > blur > grayscale)', () => {
+    expect(weakens(base, change({ filterEffect: 'grayscale' }))).toBe(true) // blur -> grayscale
+    expect(weakens(base, change({ filterEffect: 'hide' }))).toBe(false) // blur -> hide
+    expect(weakens(change({ filterEffect: 'hide' }), change({ filterEffect: 'grayscale' }))).toBe(true)
+    expect(weakens(change({ filterEffect: 'hide' }), change({ filterEffect: 'blur' }))).toBe(true)
+    expect(weakens(change({ filterEffect: 'grayscale' }), change({ filterEffect: 'blur' }))).toBe(false)
   })
 
   test('weaker video scanning weakens; stronger does not', () => {

@@ -56,6 +56,7 @@ export const verifyLock = async (password: string, cred: LockCredential): Promis
 // The subset of settings whose changes we guard.
 export type GuardedSettings = {
   filterStrictness: number
+  filterEffect: 'hide' | 'blur' | 'grayscale'
   websites: string[]
   videoSampleInterval: number
 }
@@ -64,14 +65,22 @@ export type GuardedSettings = {
 // weaker; 0 ("off") is the weakest of all. Rank so that higher = stricter.
 const videoRank = (interval: number): number => (interval <= 0 ? 0 : 1000 - interval)
 
+// Effect concealment: hide removes the content entirely; blur destroys detail
+// but leaves it on the page; grayscale only removes colour (content still fully
+// legible). So hide > blur > grayscale. Rank so that higher = stricter.
+const effectRank = (effect: GuardedSettings['filterEffect']): number =>
+  effect === 'hide' ? 2 : effect === 'blur' ? 1 : 0
+
 const cleanHosts = (hosts: string[]): string[] =>
   hosts.map(h => h.trim()).filter(h => h.length > 0)
 
-// True if `next` is weaker than `prev` in any guarded dimension:
-// lower strictness, a newly whitelisted (filter-exempt) host, or weaker video
-// scanning. Removing a whitelist entry or raising strictness is NOT weakening.
+// True if `next` is weaker than `prev` in any guarded dimension: lower
+// strictness, a weaker filter effect, a newly whitelisted (filter-exempt) host,
+// or weaker video scanning. Strengthening any dimension is NOT weakening.
 export const weakens = (prev: GuardedSettings, next: GuardedSettings): boolean => {
   if (next.filterStrictness < prev.filterStrictness) return true
+
+  if (effectRank(next.filterEffect) < effectRank(prev.filterEffect)) return true
 
   const prevHosts = new Set(cleanHosts(prev.websites))
   const addedHost = cleanHosts(next.websites).some(host => !prevHosts.has(host))
