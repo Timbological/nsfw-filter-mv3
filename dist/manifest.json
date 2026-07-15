@@ -1,6 +1,6 @@
 {
   "name": "NSFW Filter 2026",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Free, open source, and privacy-focused browser extension to block \"not safe for work\" content.",
   "author": "Tim Wildig",
   "homepage_url": "https://nsfw-filter.com",
@@ -45,7 +45,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["models/*", "models/inceptionv3/*", "images/*"],
+      "resources": ["models/*", "images/*"],
       "matches": ["<all_urls>"]
     }
   ]

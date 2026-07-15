@@ -3,7 +3,6 @@ import { SettingsActionTypes } from '../actions/settings'
 import {
   TOGGLE_LOGGING,
   SET_FILTER_EFFECT,
-  SET_TRAINED_MODEL,
   SET_FILTER_STRICTNESS,
   SET_WEBSITE_LIST,
   SET_VIDEO_SAMPLE_INTERVAL
@@ -12,7 +11,10 @@ import {
 export type SettingsState = {
   logging: boolean
   filterEffect: 'hide' | 'blur' | 'grayscale'
-  trainedModel: 'MobileNet_v2' | 'InceptionV3'
+  // Only MobileNet_v2 ships. InceptionV3 was removed in 3.2.1: as a Keras
+  // layers model it produced garbage verdicts on the WebGPU backend (fail-open)
+  // and was more permissive than MobileNet even when working.
+  trainedModel: 'MobileNet_v2'
   filterStrictness: number
   websites: string[]
   // Seconds between video frame samples. 0 disables video scanning.
@@ -34,8 +36,6 @@ export function settings (state = initialState, action: SettingsActionTypes): Se
       return { ...state, logging: !state.logging }
     case SET_FILTER_EFFECT:
       return { ...state, filterEffect: action.payload.filterEffect }
-    case SET_TRAINED_MODEL:
-      return { ...state, trainedModel: action.payload.trainedModel }
     case SET_FILTER_STRICTNESS:
       return { ...state, filterStrictness: action.payload.filterStrictness }
     case SET_WEBSITE_LIST:

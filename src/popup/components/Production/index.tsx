@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from 'react-redux'
 
 import { setFilterStrictness } from '../../redux/actions/settings'
 import {
-  setTrainedModel,
   setFilterEffect,
   setWebsiteList,
   setVideoSampleInterval
@@ -20,7 +19,6 @@ export const Production: React.FC = () => {
   const dispatch = useDispatch()
   const {
     filterStrictness,
-    trainedModel,
     filterEffect,
     websites,
     videoSampleInterval
@@ -52,17 +50,6 @@ export const Production: React.FC = () => {
           <Option value="hide">Hide</Option>
           <Option value="blur">Blur</Option>
           <Option value="grayscale">Grayscale</Option>
-        </Select>
-      </DropdownRow>
-      <DropdownRow>
-        <span>Trained model</span>
-        <Select
-          defaultValue={trainedModel}
-          style={{ width: 140 }}
-          onChange={value => dispatch(setTrainedModel(value))}
-        >
-          <Option value="MobileNet_v2">MobileNet v2</Option>
-          <Option value="InceptionV3">InceptionV3</Option>
         </Select>
       </DropdownRow>
       <DropdownRow>
