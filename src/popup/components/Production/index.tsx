@@ -41,6 +41,8 @@ export const Production: React.FC = () => {
   const [password, setPassword] = useState('')
   const [lockMessage, setLockMessage] = useState('')
   const [guardMessage, setGuardMessage] = useState('')
+  // In-progress whitelist text; null means "not editing, show the stored list".
+  const [websitesDraft, setWebsitesDraft] = useState<string | null>(null)
 
   const hasLock = lock !== null && lock !== undefined
   const locked = hasLock && !unlocked
@@ -94,6 +96,20 @@ export const Production: React.FC = () => {
     } else {
       setLockMessage('Incorrect password')
     }
+  }
+
+  const parseHosts = (text: string): string[] =>
+    text.split(/\s*,\s*/).map(host => host.trim()).filter(host => host.length > 0)
+
+  // Whitelist edits commit on blur / Enter, not per keystroke: diffing a freeform
+  // comma list on every keystroke mistakes the middle of a deletion (e.g. "b.co"
+  // while removing "b.com") for adding a host, which blocked removals and let
+  // stray commas through while locked. Unlocked edits still save live.
+  const commitWebsites = (): void => {
+    if (websitesDraft === null) return
+    const next = parseHosts(websitesDraft)
+    guard({ websites: next }, () => dispatch(setWebsiteList(next)))
+    setWebsitesDraft(null)
   }
 
   const toggleLockAll = (checked: boolean): void =>
@@ -170,11 +186,16 @@ export const Production: React.FC = () => {
       <TextBox>
         <Input
           placeholder="www.x.com, www.facebook.com"
-          value={websites.join(', ')}
+          value={websitesDraft ?? websites.join(', ')}
           onChange={event => {
-            const next = event.target.value.split(/\s*,\s*/)
-            guard({ websites: next }, () => dispatch(setWebsiteList(next)))
+            const raw = event.target.value
+            setWebsitesDraft(raw)
+            // Unlocked: save live (no lock to enforce). Locked: hold the draft
+            // and let commitWebsites decide on blur/Enter.
+            if (!locked) dispatch(setWebsiteList(parseHosts(raw)))
           }}
+          onBlur={commitWebsites}
+          onPressEnter={commitWebsites}
         />
       </TextBox>
 
