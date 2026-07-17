@@ -17,7 +17,7 @@ import { SettingsState } from '../../redux/reducers/settings'
 import { StatisticsState } from '../../redux/reducers/statistics'
 import { createLock, verifyLock, weakens, GuardedSettings } from '../../utils/lock'
 
-import { Container, Stats, DropdownRow, TextBox } from './styles'
+import { Container, Stats, DropdownRow, TextBox, LockSection } from './styles'
 
 const { Option } = Select
 const MIN_PASSWORD_LENGTH = 4
@@ -181,7 +181,7 @@ export const Production: React.FC = () => {
       {/* Settings lock: gate weakening changes behind a parent-set password. */}
       {!hasLock
         ? (
-          <TextBox>
+          <LockSection>
             <div>Set protection password (optional)</div>
             <Input
               type="password"
@@ -189,36 +189,39 @@ export const Production: React.FC = () => {
               value={password}
               onChange={event => { setPassword(event.target.value); setLockMessage('') }}
             />
-            <Button type="primary" style={{ marginTop: 8 }} onClick={() => { handleSetPassword().catch(() => undefined) }}>
+            <Button type="primary" onClick={() => { handleSetPassword().catch(() => undefined) }}>
               Set password
             </Button>
             {protectionOptions}
-            {lockMessage !== '' && <div style={{ marginTop: 8 }}>{lockMessage}</div>}
-          </TextBox>
+            {lockMessage !== '' && <div>{lockMessage}</div>}
+          </LockSection>
         )
         : locked
           ? (
-            <TextBox>
+            <LockSection>
               <div>🔒 Settings locked</div>
               <Input
                 type="password"
-                placeholder="Password to reduce protection"
+                placeholder="Password"
                 value={password}
                 onChange={event => { setPassword(event.target.value); setLockMessage('') }}
+                onPressEnter={() => { handleUnlock().catch(() => undefined) }}
               />
-              <Button type="primary" style={{ marginTop: 8 }} onClick={() => { handleUnlock().catch(() => undefined) }}>
+              <Button type="primary" onClick={() => { handleUnlock().catch(() => undefined) }}>
                 Unlock
               </Button>
-              {lockMessage !== '' && <div style={{ marginTop: 8, color: '#cf1322' }}>{lockMessage}</div>}
-            </TextBox>
+              {lockMessage !== '' && <div style={{ color: '#cf1322' }}>{lockMessage}</div>}
+            </LockSection>
           )
           : (
-            <TextBox>
+            <LockSection>
               <div>🔓 Unlocked</div>
-              <Button style={{ marginRight: 8 }} onClick={() => setUnlocked(false)}>Re-lock</Button>
-              <Button danger onClick={() => { dispatch(setLock(null)); setUnlocked(false) }}>Remove password</Button>
+              <div>
+                <Button style={{ marginRight: 8 }} onClick={() => setUnlocked(false)}>Re-lock</Button>
+                <Button danger onClick={() => { dispatch(setLock(null)); setUnlocked(false) }}>Remove password</Button>
+              </div>
               {protectionOptions}
-            </TextBox>
+            </LockSection>
           )}
     </Container>)
   )
