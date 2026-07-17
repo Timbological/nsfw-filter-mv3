@@ -31,3 +31,13 @@ export const TextBox = styled.div`
   flex-direction: row;
   padding: 7px 0;
 `
+
+// Column layout for the settings-lock UI (label above, full-width input, then
+// buttons/options), so nothing gets crammed onto one row.
+export const LockSection = styled.div`
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 0 0;
+`
